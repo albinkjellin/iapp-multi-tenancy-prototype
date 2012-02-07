@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:spring="http://www.springframework.org/schema/beans"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:jdbc="http://www.mulesoft.org/schema/mule/jdbc"
+      xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+      xmlns:cxf="http://www.mulesoft.org/schema/mule/cxf"
+      xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting"
+      xmlns:mule-xml="http://www.mulesoft.org/schema/mule/xml"
+      xmlns:client="http://www.mulesoft.org/schema/mule/client"
+      xmlns:context="http://www.springframework.org/schema/context"
+      xmlns:zuora="http://www.mulesoft.org/schema/mule/zuora"
+      xmlns:rest="http://www.mulesoft.org/schema/mule/rest"
+      xmlns:sqs="http://www.mulesoft.org/schema/mule/sqs"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/3.2/mule.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/3.2/mule-http.xsd
+        http://www.mulesoft.org/schema/mule/jdbc http://www.mulesoft.org/schema/mule/jdbc/3.2/mule-jdbc.xsd
+        http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/3.2/mule-vm.xsd
+        http://www.mulesoft.org/schema/mule/cxf http://www.mulesoft.org/schema/mule/cxf/3.2/mule-cxf.xsd
+        http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/3.2/mule-scripting.xsd
+        http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/3.2/mule-xml.xsd
+        http://www.mulesoft.org/schema/mule/client http://www.mulesoft.org/schema/mule/client/3.2/mule-client.xsd
+        http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+        http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-3.0.xsd
+        http://www.mulesoft.org/schema/mule/zuora http://www.mulesoft.org/schema/mule/zuora/1.0/mule-zuora.xsd
+        http://www.mulesoft.org/schema/mule/rest http://www.mulesoft.org/schema/mule/rest/1.0/mule-rest.xsd
+        http://www.mulesoft.org/schema/mule/sqs http://www.mulesoft.org/schema/mule/sqs/1.0/mule-sqs.xsd">
+
+    <description>
+
+    </description>
+
+    <context:property-placeholder location="mule.${mule.env}.properties"/>
+
+    <zuora:config name="z-conn" username="${zuora.user}"
+                  password="${zuora.password}" endpoint="${zuora.url}"/>
+
+    <rest:config/>
+
+    <sqs:config name="sqsconfig" accessKey="${sqs.access.key}"
+                secretAccessKey="${sqs.access.key.secret}"/>
+
+
+    <spring:bean id="jdbcDataSource"
+                 class="org.enhydra.jdbc.standard.StandardDataSource" destroy-method="shutdown">
+        <spring:property name="driverName" value="${db.driverClass}"/>
+        <spring:property name="url" value="${db.url}"/>
+        <spring:property name="user" value="${db.user}"/>
+        <spring:property name="password" value="${db.password}"/>
+    </spring:bean>
+
+    <jdbc:connector name="jdbcConnectorAdmin" dataSource-ref="jdbcDataSource">
+
+        <jdbc:query key="getCredentials"
+                    value="SELECT * FROM cred where apikey = #[variable:apikey]"/>
+
+
+    </jdbc:connector>
+
+    <!-- The invoke router that based on an api key retrieves the customer credentials. -->
+    <flow name="invoke-router">
+        <http:inbound-endpoint host="localhost" port="${http.port}" exchange-pattern="request-response"/>
+        <!-- This could be triggered by external scheduler or an outbound message -->
+        <rest:router templateUri="{customer}/{apikey}/{operation}/{id}">
+            <rest:get>
+                <enricher>
+                    <processor-chain>
+                        <jdbc:outbound-endpoint exchange-pattern="request-response" queryKey="getCredentials"
+                                                connector-ref="jdbcConnectorAdmin"/>
+                        <expression-transformer evaluator="groovy" expression="payload.first()"/>
+                    </processor-chain>
+                    <!-- Not sure if this one should get all credentials for the full flow or only the Zuora one? -->
+                    <enrich target="#[header:outbound:username]" source="#[map-payload:username]"/>
+                    <enrich target="#[header:outbound:password]" source="#[map-payload:pw]"/>
+                </enricher>
+                <expression-transformer evaluator="groovy"
+                                        expression="['id':message.getInvocationProperty('id')]"/>
+                <choice>
+                    <when evaluator="groovy" expression="message.getInvocationProperty('operation') == 'invoice'">
+                        <flow-ref name="getinvoice"/>
+                    </when>
+                    <otherwise>
+                        <logger message="No Operation found for operation #[variable:operation]"/>
+                    </otherwise>
+                </choice>
+            </rest:get>
+        </rest:router>
+    </flow>
+
+    <!-- This flow retreives the object that needs to be synced and sends it to a queue.-->
+    <flow name="sync-invoice">
+
+        <zuora:get-invoice invoiceId="#[map-payload:id]" username="#[header:outbound:username]"
+                           password="#[header:outbound:password]"/>
+
+        <scripting:transformer name="createIntactInvoice" >
+            <scripting:script engine="groovy" file="CreteOagisInvoice.groovy"/>
+        </scripting:transformer>
+        <!-- Here the message would be sent to a queueing provider -->
+        <!--<sqs:send-message queueName="test"/>-->
+    </flow>
+
+</mule>

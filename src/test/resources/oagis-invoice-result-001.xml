@@ -1,0 +1,63 @@
+<SyncInvoice>
+    <ApplicationArea>
+        <Sender>
+            <LogicalID>Zuora</LogicalID>
+            <ComponentID>TestComponent</ComponentID>
+        </Sender>
+        <CreationDateTime>2012-02-05T20:11:042-0800</CreationDateTime>
+    </ApplicationArea>
+    <DataArea>
+        <Sync>
+            <ActionCriteria>
+                <ChangeStatus>
+                    <Code>Sync</Code>
+                    <ReasonCode>New</ReasonCode>
+                    <Reason>New Invoice</Reason>
+                    <StateChange>
+                        <ToStateCode>New</ToStateCode>
+                    </StateChange>
+                </ChangeStatus>
+            </ActionCriteria>
+        </Sync>
+        <Invoice>
+            <InvoiceHeader>
+                <DocumentID>INV00000113</DocumentID>
+                <AlternateDocumentID agencyRole='zuora-id'>4028e69635222f9c0135404903a1677b</AlternateDocumentID>
+                <DocumentDateTime>2012-02-02T14:57:01.000-08:00</DocumentDateTime>
+                <TotalAmount currencyID='USD'>1</TotalAmount>
+                <CustomerParty>
+                    <PartyIDs>
+                        <ID>intacct7</ID>
+                        <Name>intacct7</Name>
+                        <Address>
+                            <AddressLine>30 Maiden Ln</AddressLine>
+                            <CitySubDivisionName>California</CitySubDivisionName>
+                            <CityName>San Francisco</CityName>
+                            <CountryCode>United States</CountryCode>
+                            <PostalCode>94108</PostalCode>
+                        </Address>
+                    </PartyIDs>
+                </CustomerParty>
+                <PaymentTerm type='Net 30'>
+                    <Term>
+                        <DueDateTime>2012-03-02T00:00:00.000-08:00</DueDateTime>
+                    </Term>
+                </PaymentTerm>
+            </InvoiceHeader>
+            <Item>
+                <ItemID>SKU-00000002</ItemID>
+            </Item>
+            <Description/>
+            <Quantity unitCode='Each'>1</Quantity>
+            <UnitPrice>
+                <Amount currencyID='USD'>1</Amount>
+                <PerQuantity unitCode='Each'>1</PerQuantity>
+                <TimePeriod>
+                    <StartDateTime>2012-02-01T00:00:00.000-08:00</StartDateTime>
+                    <EndDateTime>2012-02-01T00:00:00.000-08:00</EndDateTime>
+                </TimePeriod>
+            </UnitPrice>
+            <TotalAmount currencyID='USD'>1</TotalAmount>
+        </Invoice>
+    </DataArea>
+</SyncInvoice>
